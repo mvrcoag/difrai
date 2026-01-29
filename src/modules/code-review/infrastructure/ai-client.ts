@@ -35,9 +35,6 @@ export class AiCodeReviewer {
       ? "https://openrouter.ai/api/v1"
       : undefined;
 
-    // env.ts validation ensures at least one key exists, but TS might not know it here if I don't assert,
-    // but the runtime check in env.ts guarantees it.
-
     if (!apiKey) {
       throw new Error("AI API Key is missing even after env validation.");
     }

@@ -8,12 +8,16 @@ export class TeamsNotifier implements Notifier {
 
   constructor() {
     if (!env.TEAMS_WEBHOOK_URL) {
-        throw new Error("TEAMS_WEBHOOK_URL is missing");
+      throw new Error("TEAMS_WEBHOOK_URL is missing");
     }
     this.webhookUrl = env.TEAMS_WEBHOOK_URL;
   }
 
-  async send(review: StructuredReview, metadata: CommitMetadata, _recipient?: string): Promise<void> {
+  async send(
+    review: StructuredReview,
+    metadata: CommitMetadata,
+    _recipient?: string,
+  ): Promise<void> {
     const card = this.generateCard(review, metadata);
     try {
       const response = await fetch(this.webhookUrl, {
@@ -26,11 +30,16 @@ export class TeamsNotifier implements Notifier {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
-      throw new NotificationError(`Failed to send Teams notification: ${message}`);
+      throw new NotificationError(
+        `Failed to send Teams notification: ${message}`,
+      );
     }
   }
 
-  private generateCard(review: StructuredReview, metadata: CommitMetadata): object {
+  private generateCard(
+    review: StructuredReview,
+    metadata: CommitMetadata,
+  ): object {
     const findings = review.findings.slice(0, 10);
 
     const severityColorMap: Record<string, string> = {
@@ -68,9 +77,9 @@ export class TeamsNotifier implements Notifier {
                       {
                         type: "Image",
                         url: "https://cdn-icons-png.flaticon.com/512/2111/2111432.png",
-                        size: "Small"
-                      }
-                    ]
+                        size: "Small",
+                      },
+                    ],
                   },
                   {
                     type: "Column",
@@ -80,17 +89,17 @@ export class TeamsNotifier implements Notifier {
                         type: "TextBlock",
                         text: `AI Review: ${metadata.repo}`,
                         weight: "Bolder",
-                        size: "Medium"
+                        size: "Medium",
                       },
                       {
                         type: "TextBlock",
                         text: `${icon} Status: ${review.overallSeverity.toUpperCase()}`,
                         color: color,
-                        spacing: "None"
-                      }
-                    ]
-                  }
-                ]
+                        spacing: "None",
+                      },
+                    ],
+                  },
+                ],
               },
               {
                 type: "Container",
@@ -101,21 +110,24 @@ export class TeamsNotifier implements Notifier {
                     type: "TextBlock",
                     text: review.summary,
                     wrap: true,
-                    italic: true
-                  }
-                ]
+                    italic: true,
+                  },
+                ],
               },
               {
                 type: "FactSet",
                 facts: [
                   { title: "Author", value: metadata.author },
                   { title: "Date", value: metadata.date },
-                  { title: "Commit", value: `[View on GitHub](${metadata.url})` }
-                ]
+                  {
+                    title: "Commit",
+                    value: `[View on GitHub](${metadata.url})`,
+                  },
+                ],
               },
               {
                 type: "Container",
-                items: findings.map(f => {
+                items: findings.map((f) => {
                   const fColor = severityColorMap[f.severity] || "Default";
                   const fIcon = severityIconMap[f.severity] || "▪️";
                   return {
@@ -126,7 +138,7 @@ export class TeamsNotifier implements Notifier {
                         type: "TextBlock",
                         text: `${fIcon} **${f.title}**`,
                         wrap: true,
-                        color: fColor
+                        color: fColor,
                       },
                       {
                         type: "TextBlock",
@@ -134,52 +146,60 @@ export class TeamsNotifier implements Notifier {
                         text: `File: ${f.filePath}${f.lineRange ? ` (L${f.lineRange.start}-${f.lineRange.end})` : ""}`,
                         isSubtle: true,
                         wrap: true,
-                        size: "Small"
+                        size: "Small",
                       },
                       {
                         type: "TextBlock",
                         text: f.description,
                         wrap: true,
-                        size: "Small"
-                      },
-                      ...(f.suggestion ? [{
-                        type: "TextBlock",
-                        text: `**Suggestion:** ${f.suggestion}`,
-                        wrap: true,
                         size: "Small",
-                        spacing: "Small"
-                      }] : []),
-                      ...(f.codeSuggestion ? [{
-                        type: "Container",
-                        style: "emphasis",
-                        items: [
-                          {
-                            type: "TextBlock",
-                            text: f.codeSuggestion,
-                            wrap: true,
-                            fontType: "Monospace",
-                            size: "Small"
-                          }
-                        ],
-                        spacing: "Small"
-                      }] : [])
-                    ]
+                      },
+                      ...(f.suggestion
+                        ? [
+                            {
+                              type: "TextBlock",
+                              text: `**Suggestion:** ${f.suggestion}`,
+                              wrap: true,
+                              size: "Small",
+                              spacing: "Small",
+                            },
+                          ]
+                        : []),
+                      ...(f.codeSuggestion
+                        ? [
+                            {
+                              type: "Container",
+                              style: "emphasis",
+                              items: [
+                                {
+                                  type: "TextBlock",
+                                  text: f.codeSuggestion,
+                                  wrap: true,
+                                  fontType: "Monospace",
+                                  size: "Small",
+                                },
+                              ],
+                              spacing: "Small",
+                            },
+                          ]
+                        : []),
+                    ],
                   };
-                })
-              }
+                }),
+              },
             ],
             actions: [
               {
                 type: "Action.OpenUrl",
                 title: "View Commit on GitHub",
-                url: metadata.url
-              }
+                url: metadata.url,
+              },
             ],
             $schema: "http://adaptivecards.io/schemas/adaptive-card.json",
-            version: "1.4"
-          }
-        }
-      ]
+            version: "1.4",
+          },
+        },
+      ],
     };
   }
 }

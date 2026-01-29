@@ -25,3 +25,17 @@ export class NotificationError extends CodeReviewDomainError {
     this.name = "NotificationError";
   }
 }
+
+export class InvalidPayloadError extends CodeReviewDomainError {
+  constructor(public details: any) {
+    super("Invalid Payload");
+    this.name = "InvalidPayloadError";
+  }
+}
+
+export class InvalidJsonError extends CodeReviewDomainError {
+  constructor() {
+    super("Invalid JSON");
+    this.name = "InvalidJsonError";
+  }
+}

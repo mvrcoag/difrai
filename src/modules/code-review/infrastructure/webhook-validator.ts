@@ -9,14 +9,19 @@ export class WebhookValidator {
     this.secret = env.GITHUB_WEBHOOK_SECRET;
   }
 
-  async validate(signatureHeader: string | undefined, rawBody: string): Promise<void> {
+  async validate(
+    signatureHeader: string | undefined,
+    rawBody: string,
+  ): Promise<void> {
     if (!signatureHeader) {
       throw new WebhookValidationError("Missing X-Hub-Signature-256 header.");
     }
 
     const [algorithm, signature] = signatureHeader.split("=");
     if (algorithm !== "sha256" || !signature) {
-      throw new WebhookValidationError("Invalid signature format. Expected sha256=<signature>");
+      throw new WebhookValidationError(
+        "Invalid signature format. Expected sha256=<signature>",
+      );
     }
 
     const hmac = createHmac("sha256", this.secret);
@@ -26,7 +31,10 @@ export class WebhookValidator {
     const trusted = Buffer.from(calculatedSignature, "ascii");
     const untrusted = Buffer.from(signature, "ascii");
 
-    if (trusted.length !== untrusted.length || !timingSafeEqual(trusted, untrusted)) {
+    if (
+      trusted.length !== untrusted.length ||
+      !timingSafeEqual(trusted, untrusted)
+    ) {
       throw new WebhookValidationError("Invalid signature. content mismatch.");
     }
   }

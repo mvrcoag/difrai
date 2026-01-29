@@ -38,62 +38,83 @@ export class ReviewService {
   async processPushEvent(payload: GithubPushEvent): Promise<void> {
     const { repository, commits } = payload;
 
-    // Zod schema ensures commits array exists, but empty check is fine
     if (!commits || commits.length === 0) {
       return;
     }
 
+    for (const commit of commits) {
+      await this.processCommit(repository, commit);
+    }
+  }
+
+  private async processCommit(
+    repository: GithubPushEvent["repository"],
+    commit: GithubPushEvent["commits"][number],
+  ): Promise<void> {
+    const diff = await this.fetchDiff(repository, commit);
+    if (!diff) return;
+
+    const review = await this.analyzeChanges(diff, commit.id);
+    if (!review) return;
+
+    const metadata = this.createMetadata(repository, commit);
+    await this.notify(review, metadata, commit.author?.email);
+  }
+
+  private async fetchDiff(
+    repository: GithubPushEvent["repository"],
+    commit: GithubPushEvent["commits"][number],
+  ): Promise<string | null> {
     const owner = repository.owner.name || repository.owner.login;
     const repo = repository.name;
 
-    for (const commit of commits) {
-      console.log("C", commit);
-      // 1. Fetch Diff
-      let diff: string;
-      try {
-        diff = await this.githubClient.getCommitDiff(owner, repo, commit.id);
-      } catch (e) {
-        console.error(`Skipping commit ${commit.id}: Failed to fetch diff`, e);
-        continue;
-      }
+    try {
+      return await this.githubClient.getCommitDiff(owner, repo, commit.id);
+    } catch (e) {
+      console.error(`Skipping commit ${commit.id}: Failed to fetch diff`, e);
+      return null;
+    }
+  }
 
-      console.log("D", diff);
+  private async analyzeChanges(diff: string, commitId: string) {
+    try {
+      return await this.aiReviewer.analyzeDiff(diff);
+    } catch (e) {
+      console.error(`Skipping commit ${commitId}: AI analysis failed`, e);
+      return null;
+    }
+  }
 
-      // 2. Analyze
-      let review;
-      try {
-        review = await this.aiReviewer.analyzeDiff(diff);
-      } catch (e) {
-        console.error(`Skipping commit ${commit.id}: AI analysis failed`, e);
-        continue;
-      }
+  private createMetadata(
+    repository: GithubPushEvent["repository"],
+    commit: GithubPushEvent["commits"][number],
+  ) {
+    return {
+      repo: repository.full_name || repository.name,
+      author: commit.author.name || commit.author.username || "Unknown",
+      date: new Date(commit.timestamp).toLocaleString(),
+      url: commit.url,
+    };
+  }
 
-      console.log("R", review);
+  private async notify(
+    review: any,
+    metadata: any,
+    authorEmail?: string | null,
+  ): Promise<void> {
+    for (const notifier of this.notifiers) {
+      await notifier
+        .send(review, metadata)
+        .catch((e) => console.error("Notifier failed:", e));
+    }
 
-      // 3. Notify Teams/Global
-      const metadata = {
-        repo: repository.full_name || repository.name,
-        author: commit.author.name || commit.author.username || "Unknown",
-        date: new Date(commit.timestamp).toLocaleString(),
-        url: commit.url,
-      };
-
-      for (const notifier of this.notifiers) {
-        await notifier
-          .send(review, metadata)
-          .catch((e) => console.error("Notifier failed:", e));
-      }
-
-      // 4. Notify Author via Email
-      if (this.emailNotifier && commit.author?.email) {
-        const authorEmail = commit.author.email;
-        if (typeof authorEmail === "string" && authorEmail.includes("@")) {
-          await this.emailNotifier
-            .send(review, metadata, authorEmail)
-            .catch((e) =>
-              console.error(`Failed to send email to ${authorEmail}`, e),
-            );
-        }
+    if (this.emailNotifier && authorEmail) {
+      if (typeof authorEmail === "string" && authorEmail.includes("@")) {
+        await this.emailNotifier
+          .send(review, metadata, authorEmail)
+          .catch((e) =>
+            console.error(`Failed to send email to ${authorEmail}`, e),
+          );
       }
     }
   }
