@@ -28,7 +28,7 @@ const githubRepositorySchema = z.object({
   private: z.boolean(),
   owner: z.object({
     name: z.string().optional(),
-    email: z.string().optional(),
+    email: z.string().nullable().optional(),
     login: z.string(),
     id: z.number(),
     node_id: z.string(),
