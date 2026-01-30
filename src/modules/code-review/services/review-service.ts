@@ -6,6 +6,8 @@ import {
   type Notifier,
 } from "../infrastructure/notifier.js";
 import type { GithubPushEvent } from "../infrastructure/github-schemas.js";
+import type { GithubPullRequestEvent } from "../infrastructure/github-pr-schemas.js";
+import { mapSeverityToReviewEvent, mapFindingsToComments } from "./review-mapper.js";
 import { env } from "../../../env.js";
 import { logger } from "../../../common/logger.js";
 
@@ -54,6 +56,58 @@ export class ReviewService {
     }
     
     logger.info(`Finished processing push event for ${repository.full_name}`);
+  }
+
+  async processPullRequestEvent(payload: GithubPullRequestEvent): Promise<void> {
+    const { pull_request, repository } = payload;
+    const owner = repository.owner.login;
+    const repo = repository.name;
+    const prNumber = pull_request.number;
+
+    logger.info(`Processing PR #${prNumber} (${payload.action}) in ${repository.full_name}`);
+
+    let diff: string;
+    try {
+      diff = await this.githubClient.getPullRequestDiff(owner, repo, prNumber);
+    } catch (e) {
+      logger.error(`Failed to fetch diff for PR #${prNumber}:`, e);
+      return;
+    }
+
+    if (!diff) {
+      logger.warn(`Empty diff for PR #${prNumber}`);
+      return;
+    }
+
+    const review = await this.analyzeChanges(diff, `PR #${prNumber}`);
+    if (!review) return;
+
+    logger.info(`PR #${prNumber} review completed. Overall severity: ${review.overallSeverity}`);
+
+    if (env.GITHUB_PR_REVIEW_ENABLED) {
+      const event = mapSeverityToReviewEvent(review.overallSeverity);
+      const comments = mapFindingsToComments(review.findings);
+
+      try {
+        await this.githubClient.submitPullRequestReview(owner, repo, prNumber, {
+          body: review.summary,
+          event,
+          comments,
+        });
+        logger.info(`Submitted ${event} review on PR #${prNumber} with ${comments.length} inline comment(s)`);
+      } catch (e) {
+        logger.error(`Failed to submit review on PR #${prNumber}:`, e);
+      }
+    }
+
+    const metadata = {
+      repo: repository.full_name,
+      author: pull_request.user.login,
+      date: new Date().toLocaleString(),
+      url: pull_request.html_url,
+    };
+
+    await this.notify(review, metadata);
   }
 
   private async processCommit(

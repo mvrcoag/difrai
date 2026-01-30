@@ -23,6 +23,7 @@ Guidelines:
     -   **Warning**: Performance issues, maintainability risks, or significant code smells that should be addressed before merging.
     -   **Info**: Best practice recommendations, educational insights, or minor improvements.
 -   **Positive Reinforcement**: If the code is excellent, acknowledge it by returning a "clean" status.
+-   **Line Numbers**: When specifying \`lineRange\`, use the NEW file line numbers from the \`+\` side of the diff (the numbers after the comma in \`@@ -old,count +new,count @@\` hunk headers). These correspond to the lines as they appear in the resulting file after the change.
 
 Provide a structured review that acts as a helpful, senior-level conversation starter.`;
 

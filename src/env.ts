@@ -24,6 +24,9 @@ const envSchema = z.object({
   EMAIL_TO: z.string().optional(),
 
   TEAMS_WEBHOOK_URL: z.string().optional(),
+
+  GITHUB_PR_REVIEW_ENABLED: z.enum(["true", "false"]).default("true").transform((v) => v === "true"),
+  GITHUB_PUSH_REVIEW_ENABLED: z.enum(["true", "false"]).default("true").transform((v) => v === "true"),
 }).refine((data) => data.OPEN_ROUTER_API_KEY || data.OPENAI_API_KEY, {
   message: "Either OPEN_ROUTER_API_KEY or OPENAI_API_KEY must be set",
   path: ["OPEN_ROUTER_API_KEY"],
