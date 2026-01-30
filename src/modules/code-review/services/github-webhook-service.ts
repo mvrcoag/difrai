@@ -43,6 +43,10 @@ export class GithubWebhookService {
     const commitCount = payload.commits.length;
     
     logger.info(`Processing push event for ${repoName} with ${commitCount} commit(s)`);
-    await this.reviewService.processPushEvent(payload);
+    
+    // Fire and forget to avoid GitHub webhook timeout
+    this.reviewService.processPushEvent(payload).catch((error) => {
+      logger.error(`Critical error in background processing for ${repoName}:`, error);
+    });
   }
 }
