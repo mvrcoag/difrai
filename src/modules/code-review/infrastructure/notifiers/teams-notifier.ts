@@ -2,6 +2,7 @@ import { NotificationError } from "../../domain/errors.js";
 import type { StructuredReview } from "../schemas.js";
 import { env } from "../../../../env.js";
 import type { Notifier, CommitMetadata } from "../notifier.js";
+import { logger } from "../../../../common/logger.js";
 
 export class TeamsNotifier implements Notifier {
   private webhookUrl: string;
@@ -19,17 +20,27 @@ export class TeamsNotifier implements Notifier {
     _recipient?: string,
   ): Promise<void> {
     const card = this.generateCard(review, metadata);
+    const maskedUrl = this.webhookUrl.substring(0, 20) + "...";
+    
+    logger.debug(`Sending Adaptive Card to Teams webhook: ${maskedUrl}`);
+    
     try {
       const response = await fetch(this.webhookUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(card),
       });
+
       if (!response.ok) {
-        throw new Error(`Teams responded with ${response.status}`);
+        const errorText = await response.text().catch(() => "No response body");
+        logger.error(`Teams API error (${response.status}): ${errorText}`);
+        throw new Error(`Teams responded with ${response.status}: ${errorText}`);
       }
+
+      logger.info("Teams notification delivered successfully");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
+      logger.error(`Failed to dispatch Teams notification: ${message}`);
       throw new NotificationError(
         `Failed to send Teams notification: ${message}`,
       );

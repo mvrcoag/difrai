@@ -3,6 +3,7 @@ import { NotificationError } from "../../domain/errors.js";
 import type { StructuredReview } from "../schemas.js";
 import { env } from "../../../../env.js";
 import type { Notifier, CommitMetadata } from "../notifier.js";
+import { logger } from "../../../../common/logger.js";
 
 export class EmailNotifier implements Notifier {
   private transporter: nodemailer.Transporter;
@@ -33,8 +34,11 @@ export class EmailNotifier implements Notifier {
   ): Promise<void> {
     const to = recipient || this.defaultTo;
     if (!to) {
+      logger.warn("Skipping email notification: No recipient provided");
       throw new NotificationError("No recipient email provided");
     }
+
+    logger.debug(`Preparing email review for ${to}...`);
     const html = this.generateHtml(review, metadata);
     try {
       await this.transporter.sendMail({
@@ -43,8 +47,10 @@ export class EmailNotifier implements Notifier {
         subject: `[${review.overallSeverity.toUpperCase()}] AI Code Review: ${metadata.repo}`,
         html,
       });
+      logger.info(`Email successfully sent to ${to}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
+      logger.error(`Failed to dispatch email to ${to}: ${message}`);
       throw new NotificationError(`Failed to send email: ${message}`);
     }
   }

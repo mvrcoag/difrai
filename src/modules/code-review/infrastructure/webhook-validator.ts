@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { WebhookValidationError } from "../domain/errors.js";
 import { env } from "../../../env.js";
+import { logger } from "../../../common/logger.js";
 
 export class WebhookValidator {
   private secret: string;
@@ -13,6 +14,7 @@ export class WebhookValidator {
     signatureHeader: string | undefined,
     rawBody: string,
   ): Promise<void> {
+    logger.debug("Validating GitHub webhook signature...");
     if (!signatureHeader) {
       throw new WebhookValidationError("Missing X-Hub-Signature-256 header.");
     }
